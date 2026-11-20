@@ -20,7 +20,7 @@ class Evaluation(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    turn_id: Mapped[int] = mapped_column(ForeignKey("interview_turns.id"), unique=True)
+    turn_id: Mapped[int] = mapped_column(ForeignKey("interview_turns.id", ondelete="CASCADE"), unique=True)
     score: Mapped[float] = mapped_column(Float)
     confidence: Mapped[float] = mapped_column(Float)
     is_complete: Mapped[bool] = mapped_column(default=True)

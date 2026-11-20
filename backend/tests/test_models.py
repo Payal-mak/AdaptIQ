@@ -12,7 +12,7 @@ from app.models import (
     Topic,
     User,
 )
-from app.models.enums import Level, QuestionStatus, Role
+from app.models.enums import Level, Proficiency, QuestionStatus, Role
 
 
 def make_user(db: Session, email: str = "a@example.com", role: Role = Role.STUDENT) -> User:
@@ -120,8 +120,27 @@ def test_one_evaluation_per_turn(db: Session) -> None:
 
 def test_one_feedback_report_per_session(db: Session) -> None:
     turn = make_turn(db)
-    db.add(FeedbackReport(session_id=turn.session_id, proficiency_level=Level.MEDIUM))
+    db.add(FeedbackReport(session_id=turn.session_id, proficiency_level=Proficiency.INTERMEDIATE))
     db.flush()
-    db.add(FeedbackReport(session_id=turn.session_id, proficiency_level=Level.HARD))
+    db.add(FeedbackReport(session_id=turn.session_id, proficiency_level=Proficiency.ADVANCED))
     with pytest.raises(IntegrityError):
         db.flush()
+
+
+@pytest.mark.parametrize("delete_with", ["orm", "raw_sql"])
+def test_deleting_session_deletes_turns_and_evaluations(db: Session, delete_with: str) -> None:
+    turn = make_turn(db)
+    db.add(Evaluation(turn_id=turn.id, score=7, confidence=0.9))
+    db.flush()
+    session_id, turn_id = turn.session_id, turn.id
+
+    if delete_with == "orm":
+        db.delete(turn.session)  # ORM cascade="all, delete-orphan" removes the turns
+        db.flush()
+    else:
+        db.execute(text("DELETE FROM interview_sessions WHERE id = :i"), {"i": session_id})  # DB-level CASCADE
+    db.expire_all()
+
+    assert db.scalar(text("SELECT count(*) FROM interview_sessions WHERE id = :i"), {"i": session_id}) == 0
+    assert db.scalar(text("SELECT count(*) FROM interview_turns WHERE id = :i"), {"i": turn_id}) == 0
+    assert db.scalar(text("SELECT count(*) FROM evaluations WHERE turn_id = :i"), {"i": turn_id}) == 0

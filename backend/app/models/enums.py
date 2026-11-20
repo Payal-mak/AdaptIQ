@@ -15,6 +15,14 @@ class Level(str, enum.Enum):
     HARD = "hard"
 
 
+class Proficiency(str, enum.Enum):
+    """The student's final result for a topic (different from question Level)."""
+
+    BEGINNER = "beginner"
+    INTERMEDIATE = "intermediate"
+    ADVANCED = "advanced"
+
+
 class QuestionStatus(str, enum.Enum):
     PENDING = "pending"
     APPROVED = "approved"

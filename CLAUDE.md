@@ -77,6 +77,8 @@ Models live in `backend/app/models/`; schema changes go through Alembic (`backen
 - `interview_turns` (question as asked + answer; follow-ups have `is_follow_up` and `parent_turn_id`)
 - `evaluations` (one per turn: score 0-10, confidence, `needs_review`, faculty override fields)
 - `feedback_reports` (one per session)
+- `final_level` / `proficiency_level` use the `Proficiency` enum (beginner/intermediate/advanced); question difficulty uses `Level` (easy/medium/hard). Do not mix them.
+- Deleting a session cascades to its turns, evaluations and feedback report (DB `ON DELETE CASCADE` + ORM cascade).
 - Enums are stored as strings with CHECK constraints. Each enum column needs a unique constraint name (`enum_type(cls, name)`).
 - Not yet built: pgvector embedding column (Step 14), LLM call log table (Step 4).
 - Model tests need Docker Postgres running; they use a separate `adaptiq_test` database.
@@ -101,7 +103,7 @@ Models live in `backend/app/models/`; schema changes go through Alembic (`backen
 | # | Step | Status |
 |---|---|---|
 | 1 | Skeleton | Done |
-| 2 | Database models | In progress |
+| 2 | Database models | Done |
 | 3 | Auth (JWT, roles) | Not started |
 | 4 | LLM wrapper (retries, Groq -> Gemini fallback, call logging) | Not started |
 | 5 | Question Bank Agent | Not started |

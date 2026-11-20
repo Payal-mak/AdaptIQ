@@ -4,7 +4,7 @@ from sqlalchemy import DateTime, Float, ForeignKey, Integer, Text, UniqueConstra
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.enums import Level, SessionStatus, enum_type
+from app.models.enums import Level, Proficiency, SessionStatus, enum_type
 
 
 class InterviewSession(Base):
@@ -20,11 +20,13 @@ class InterviewSession(Base):
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Filled when the interview ends (Step 11): proficiency level and average score.
-    final_level: Mapped[Level | None] = mapped_column(enum_type(Level, "ck_sessions_final_level"))
+    final_level: Mapped[Proficiency | None] = mapped_column(enum_type(Proficiency, "ck_sessions_final_level"))
     overall_score: Mapped[float | None] = mapped_column(Float)
 
     turns: Mapped[list["InterviewTurn"]] = relationship(
-        back_populates="session", order_by="InterviewTurn.turn_number"
+        back_populates="session",
+        order_by="InterviewTurn.turn_number",
+        cascade="all, delete-orphan",
     )
 
 
@@ -35,7 +37,9 @@ class InterviewTurn(Base):
     __table_args__ = (UniqueConstraint("session_id", "turn_number"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    session_id: Mapped[int] = mapped_column(ForeignKey("interview_sessions.id"), index=True)
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("interview_sessions.id", ondelete="CASCADE"), index=True
+    )
     turn_number: Mapped[int] = mapped_column(Integer)
     # Null for follow-up questions, which are generated and not in the bank.
     question_id: Mapped[int | None] = mapped_column(ForeignKey("questions.id"))
