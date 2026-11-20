@@ -3,6 +3,7 @@
 from app.models.evaluation import Evaluation
 from app.models.feedback import FeedbackReport
 from app.models.interview import InterviewSession, InterviewTurn
+from app.models.llm_call import LlmCall
 from app.models.question import Question
 from app.models.topic import Topic
 from app.models.user import User
@@ -12,6 +13,7 @@ __all__ = [
     "FeedbackReport",
     "InterviewSession",
     "InterviewTurn",
+    "LlmCall",
     "Question",
     "Topic",
     "User",

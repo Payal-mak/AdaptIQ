@@ -12,7 +12,7 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import create_engine, text  # noqa: E402
 from sqlalchemy.engine import make_url  # noqa: E402
-from sqlalchemy.orm import Session  # noqa: E402
+from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
 
 from app import models  # noqa: E402,F401  (registers all models)
 from app.core.config import get_settings  # noqa: E402
@@ -85,3 +85,29 @@ def login_headers(client: TestClient, email: str, password: str = PASSWORD) -> d
     response = client.post("/api/auth/login", data={"username": email, "password": password})
     assert response.status_code == 200, response.text
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+# ---------------------------------------------------------------- LLM logging fixtures
+
+
+@pytest.fixture(autouse=True)
+def block_main_database_for_llm_logging(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Safety net: if any test lets LLMClient fall back to the default (real) session factory,
+    fail loudly instead of writing llm_calls rows into the main database."""
+
+    def blocked() -> None:
+        raise RuntimeError("Tests must inject a session factory bound to adaptiq_test, not the real DB")
+
+    monkeypatch.setattr("app.llm.client.default_session_factory", blocked)
+    monkeypatch.setattr("app.llm.call_log.default_session_factory", blocked)
+
+
+@pytest.fixture
+def llm_log_factory(test_engine) -> Generator[sessionmaker[Session], None, None]:  # type: ignore[no-untyped-def]
+    """Session factory for the LLM call log, bound to the adaptiq_test engine ONLY.
+    Rows it commits are deleted after each test (only ever in adaptiq_test)."""
+    assert test_engine.url.database == TEST_DB_NAME, "refusing to touch a database that is not adaptiq_test"
+    yield sessionmaker(bind=test_engine, expire_on_commit=False)
+    with test_engine.begin() as conn:
+        assert conn.engine.url.database == TEST_DB_NAME
+        conn.execute(text("DELETE FROM llm_calls"))

@@ -21,6 +21,16 @@ class Settings(BaseSettings):
     groq_model: str = ""
     gemini_api_key: str = ""
     gemini_model: str = ""
+    llm_fallback_provider: str = "gemini"
+    llm_timeout_seconds: float = 30
+    llm_max_retries: int = 2  # retries after the first try, per provider
+    llm_max_retry_wait_seconds: float = 20
+    llm_log_payloads: bool = False
+    # USD per 1 million tokens; 0 = free tier.
+    groq_input_price_per_m: float = 0
+    groq_output_price_per_m: float = 0
+    gemini_input_price_per_m: float = 0
+    gemini_output_price_per_m: float = 0
     jwt_secret: str = ""
     access_token_expire_minutes: int = 120
     # Empty = any email domain may self-register. Example: "college.edu".

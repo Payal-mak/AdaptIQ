@@ -97,6 +97,20 @@ Models live in `backend/app/models/`; schema changes go through Alembic (`backen
 - Routes call `app/services/user_service.py`; schemas are in `app/schemas/`. `UserOut` never includes `password_hash`.
 - Auth tests need Docker Postgres; `tests/conftest.py` sets a test `JWT_SECRET` so tests don't depend on `.env`.
 
+## LLM wrapper (Step 4)
+
+Agents and services must use **only `LLMClient`** (`app/llm/client.py`, shared instance via `get_llm_client()`). Never import the `groq` or `google-genai` SDKs anywhere else.
+
+- `generate_json(purpose, system, user, schema, temperature)` returns a validated Pydantic object; `generate_text(...)` returns a string. `purpose` is a short label (e.g. `"evaluate_answer"`) saved in the log.
+- JSON replies are validated against the schema. If invalid: ONE repair call that includes the validation error; if still invalid, `InvalidOutputError`.
+- Retries: `RateLimitError` / `TransientError` are retried up to `LLM_MAX_RETRIES` times (default 2, so up to 3 attempts) with exponential backoff (1s, 2s, 4s...) plus jitter, and at least the provider's `Retry-After`. If the wait would exceed `LLM_MAX_RETRY_WAIT_SECONDS` (20), stop retrying that provider.
+- `AuthError` / `BadRequestError` are never retried and never trigger the fallback; they raise immediately with a clear message.
+- Fallback: after the primary provider fails (rate limit, transient, or invalid output after its repair), the fallback provider is tried once with the same rules. A fallback with no API key is skipped.
+- Every attempt (including failures) is one row in `llm_calls`: purpose, provider, model, success, error_type, attempt, fallback_used, tokens, latency_ms, estimated cost. Prompts/responses are saved only if `LLM_LOG_PAYLOADS=true` (they contain student answers). A failure while logging never breaks the call.
+- Provider SDKs are used with their own retries disabled; only our wrapper retries.
+- Model names, keys and prices come only from `.env`. Never log keys.
+- Tests use `FakeProvider` only (no real API calls). The log writer's session factory is injected; tests point it at `adaptiq_test` and an autouse fixture blocks the real DB. Real-key check: `python -m app.scripts.llm_smoke` (never run by pytest).
+
 ## Coding rules
 
 1. Type hints everywhere (Python and TypeScript; no `any`).
@@ -104,6 +118,7 @@ Models live in `backend/app/models/`; schema changes go through Alembic (`backen
 3. Anything that must be consistent (difficulty rules, eligibility, score aggregation) is plain code with unit tests, never an LLM.
 4. Secrets only in `.env`. Never hardcode keys, model names or passwords. `.env` is never committed.
 5. Routes stay thin: validate input, call a service/agent, return a response.
+6. `.env.example` must only contain placeholders, never real keys or secrets.
 
 ## Workflow rules
 
@@ -119,7 +134,7 @@ Models live in `backend/app/models/`; schema changes go through Alembic (`backen
 | 1 | Skeleton | Done |
 | 2 | Database models | Done |
 | 3 | Auth (JWT, roles) | Done |
-| 4 | LLM wrapper (retries, Groq -> Gemini fallback, call logging) | Not started |
+| 4 | LLM wrapper (retries, Groq -> Gemini fallback, call logging) | Done |
 | 5 | Question Bank Agent | Not started |
 | 6 | Evaluator Agent | Not started |
 | 7 | Difficulty Controller | Not started |

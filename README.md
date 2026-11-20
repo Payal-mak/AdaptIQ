@@ -93,3 +93,15 @@ Start the backend (`uvicorn app.main:app --reload`), then open http://localhost:
 2. Open `GET /api/auth/me` -> **Try it out** -> **Execute**. It should return your admin user (no password in the response).
 3. Open `POST /api/users` and create a faculty account with `"role": "faculty"`.
 4. To test a student: call `POST /api/auth/register` (no login needed), then click Authorize again with the student's email and password. `GET /api/users` should now return **403**.
+
+## 8. Check your LLM keys (smoke test)
+
+Put your keys and model names in `.env` (`GROQ_API_KEY`, `GROQ_MODEL`, `GEMINI_API_KEY`, `GEMINI_MODEL`), then:
+
+```powershell
+cd backend
+.venv\Scripts\Activate.ps1
+python -m app.scripts.llm_smoke
+```
+
+It sends one tiny JSON request to each provider separately and prints the provider, model, latency, token counts, and either `SUCCESS` or the exact error (for example "Groq rejected the API key"). A provider without a key is skipped. This uses real API calls, so it is never run by `pytest`. It does not write to the database.
