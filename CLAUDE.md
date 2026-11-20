@@ -68,6 +68,19 @@ adaptiq/
 └── CLAUDE.md
 ```
 
+## Data model (Step 2)
+
+Models live in `backend/app/models/`; schema changes go through Alembic (`backend/alembic/`), never by hand.
+
+- `users` (role: student/faculty/admin), `topics`, `questions` (level, status pending/approved/rejected, `expected_points`)
+- `interview_sessions` (one student + topic, `current_level`, final level/score)
+- `interview_turns` (question as asked + answer; follow-ups have `is_follow_up` and `parent_turn_id`)
+- `evaluations` (one per turn: score 0-10, confidence, `needs_review`, faculty override fields)
+- `feedback_reports` (one per session)
+- Enums are stored as strings with CHECK constraints. Each enum column needs a unique constraint name (`enum_type(cls, name)`).
+- Not yet built: pgvector embedding column (Step 14), LLM call log table (Step 4).
+- Model tests need Docker Postgres running; they use a separate `adaptiq_test` database.
+
 ## Coding rules
 
 1. Type hints everywhere (Python and TypeScript; no `any`).
@@ -88,7 +101,7 @@ adaptiq/
 | # | Step | Status |
 |---|---|---|
 | 1 | Skeleton | Done |
-| 2 | Database models | Not started |
+| 2 | Database models | In progress |
 | 3 | Auth (JWT, roles) | Not started |
 | 4 | LLM wrapper (retries, Groq -> Gemini fallback, call logging) | Not started |
 | 5 | Question Bank Agent | Not started |
