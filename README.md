@@ -14,7 +14,15 @@ Python 3.11+, Node.js 20+, Docker Desktop (running).
 Copy-Item .env.example .env
 ```
 
-Open `.env` and fill in values. For Step 1 only `DATABASE_URL` matters, and the default already matches docker-compose.
+Open `.env` and fill in values. `DATABASE_URL` already matches docker-compose.
+
+**`JWT_SECRET` is required.** The backend refuses to start if it is empty, shorter than 32 characters, or still the placeholder. Generate one and paste it into `.env`:
+
+```powershell
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+Optional: set `ALLOWED_EMAIL_DOMAIN=college.edu` to limit student self-registration to that email domain (empty = any email).
 
 ## 2. Start the database
 
@@ -65,4 +73,23 @@ cd backend
 pytest
 ```
 
-The tests do not need Docker.
+Most tests need the Docker database running (they use a separate `adaptiq_test` database, created automatically). If Docker is off, those tests are skipped.
+
+## 7. Create the first admin and try login
+
+Run migrations and seed topics once (database must be running):
+
+```powershell
+cd backend
+.venv\Scripts\Activate.ps1
+alembic upgrade head
+python -m app.db.seed
+python -m app.scripts.create_admin     # asks for email, name, password (typing is hidden)
+```
+
+Start the backend (`uvicorn app.main:app --reload`), then open http://localhost:8000/docs and:
+
+1. Click **Authorize** (top right). Enter your admin **email in the `username` box** and your password. Leave client_id/client_secret empty. Click Authorize, then Close.
+2. Open `GET /api/auth/me` -> **Try it out** -> **Execute**. It should return your admin user (no password in the response).
+3. Open `POST /api/users` and create a faculty account with `"role": "faculty"`.
+4. To test a student: call `POST /api/auth/register` (no login needed), then click Authorize again with the student's email and password. `GET /api/users` should now return **403**.

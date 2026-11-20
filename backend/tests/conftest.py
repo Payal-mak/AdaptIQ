@@ -1,17 +1,30 @@
-"""Shared fixtures. Model tests use a separate `adaptiq_test` database (needs Docker running)."""
+"""Shared fixtures. DB tests use a separate `adaptiq_test` database (needs Docker running)."""
 
+import os
 from collections.abc import Generator
 
-import pytest
-from sqlalchemy import create_engine, text
-from sqlalchemy.engine import make_url
-from sqlalchemy.orm import Session
+# Tests must not depend on the developer's real .env: set safe values BEFORE the app is imported.
+os.environ["JWT_SECRET"] = "test-secret-key-that-is-long-enough-0123456789"
+os.environ["ALLOWED_EMAIL_DOMAIN"] = ""
+os.environ["ACCESS_TOKEN_EXPIRE_MINUTES"] = "120"
 
-from app import models  # noqa: F401  (registers all models)
-from app.core.config import get_settings
-from app.db.base import Base
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import create_engine, text  # noqa: E402
+from sqlalchemy.engine import make_url  # noqa: E402
+from sqlalchemy.orm import Session  # noqa: E402
+
+from app import models  # noqa: E402,F401  (registers all models)
+from app.core.config import get_settings  # noqa: E402
+from app.db.base import Base  # noqa: E402
+from app.db.session import get_db  # noqa: E402
+from app.main import app  # noqa: E402
+from app.models.enums import Role  # noqa: E402
+from app.models.user import User  # noqa: E402
+from app.services import user_service  # noqa: E402
 
 TEST_DB_NAME = "adaptiq_test"
+PASSWORD = "correct-horse-battery"
 
 
 @pytest.fixture(scope="session")
@@ -48,3 +61,27 @@ def db(test_engine) -> Generator[Session, None, None]:  # type: ignore[no-untype
     session.close()
     transaction.rollback()
     connection.close()
+
+
+@pytest.fixture
+def client(db: Session) -> Generator[TestClient, None, None]:
+    """TestClient whose requests use the rolled-back test session."""
+
+    def override_get_db() -> Generator[Session, None, None]:
+        yield db
+
+    app.dependency_overrides[get_db] = override_get_db
+    yield TestClient(app)
+    app.dependency_overrides.clear()
+
+
+def make_account(db: Session, email: str, role: Role = Role.STUDENT, password: str = PASSWORD) -> User:
+    """Create a user directly in the test DB."""
+    return user_service.create_user(db, email, "Test Person", password, role)
+
+
+def login_headers(client: TestClient, email: str, password: str = PASSWORD) -> dict[str, str]:
+    """Log in through the real endpoint and return the Authorization header."""
+    response = client.post("/api/auth/login", data={"username": email, "password": password})
+    assert response.status_code == 200, response.text
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
