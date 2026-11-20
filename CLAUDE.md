@@ -87,7 +87,7 @@ adaptiq/
 
 | # | Step | Status |
 |---|---|---|
-| 1 | Skeleton | In progress |
+| 1 | Skeleton | Done |
 | 2 | Database models | Not started |
 | 3 | Auth (JWT, roles) | Not started |
 | 4 | LLM wrapper (retries, Groq -> Gemini fallback, call logging) | Not started |
